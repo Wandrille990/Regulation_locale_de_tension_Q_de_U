@@ -21,13 +21,13 @@ load_scaling = np.clip(0.3 + 0.2 * np.cos(np.linspace(0, np.pi, time_steps)+np.p
 pv_elements = net.sgen[net.sgen['type'] == 'PV'].index
 load_elements = net.load.index
 
-ds = pd.DataFrame(index=range(time_steps), columns=[])
-for el in pv_elements:
-    ds[f"sgen_p_{el}"] = pv_scaling
-for el in load_elements:
-    ds[f"load_p_{el}"] = load_scaling
-
-ds = ds.copy()
+#ds = pd.DataFrame(index=range(time_steps), columns=[])
+#for el in pv_elements:
+#    ds[f"sgen_p_{el}"] = pv_scaling
+#for el in load_elements:
+#    ds[f"load_p_{el}"] = load_scaling
+#
+#ds_defrag = ds.copy()
 
 # 5. Create a Q=f(U) Controller (example linear droop function)
 class QVoltageDroopControl(ctrl.basic_controller.Controller):
@@ -70,9 +70,9 @@ def run_timeseries(net, control_enabled=False):
 
     for t in range(time_steps):
         for el in pv_elements:
-            net.sgen.at[el, "p_mw"] = ds.at[t, f"sgen_p_{el}"] * net.sgen.at[el, "p_mw"]
+            net.sgen.at[el, "scaling"] = pv_scaling[t]
         for el in load_elements:
-            net.load.at[el, "p_mw"] = ds.at[t, f"load_p_{el}"] * net.load.at[el, "p_mw"]
+            net.load.at[el, "scaling"] = load_scaling[t]
 
         pp.runpp(net, run_control=control_enabled)
         if control_enabled:
@@ -95,7 +95,7 @@ results_c = run_timeseries(net_control, control_enabled=True)
 # 8. Plot voltage profile at midday (highest PV, lowest load)
 midday = time_steps // 2
 plt.figure(figsize=(12, 6))
-plt.plot(results_nc[midday], 'ro-', label="No Q=f(U) Control")
+plt.plot(results_nc[midday], 'r.-', label="No Q=f(U) Control")
 plt.plot(results_c[midday], 'g.-', label="With Q=f(U) Control")
 plt.axhline(1.1, color='k', linestyle='--', label="Voltage Limits (±10%)")
 plt.axhline(0.9, color='k', linestyle='--')
