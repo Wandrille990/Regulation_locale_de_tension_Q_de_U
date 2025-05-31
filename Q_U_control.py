@@ -9,6 +9,7 @@ from pandapower.timeseries.data_sources.frame_data import DFData
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import namedtuple
 
 
 # 1. Load existing network (e.g., MV network with PV)
@@ -66,7 +67,10 @@ output_path_no_ctrl = r"C:\Users\Wandrille\Documents\ESIEE\E4FT\Cours E4FT\Multi
 output_path_ctrl = r"C:\Users\Wandrille\Documents\ESIEE\E4FT\Cours E4FT\Multiphysique\Regulation_locale_de_tension_Q_de_U\Resultats\res_ctrl"
 
 net_no_control = pn.mv_oberrhein(scenario="generation")
+net_no_control.sgen.scaling = 1
 net_control = pn.mv_oberrhein(scenario="generation")
+net_control.sgen.scaling = 1
+
 
 for trsf_id in net_control.trafo.index:
     net_control.trafo.loc[trsf_id, "tap_pos"] = -5  # net_control.trafo.loc[trsf_id, "tap_min"]
@@ -89,7 +93,7 @@ res_p_mw_c = res_p_mw_c.drop("Unnamed: 0", axis=1)
 print(f"Energie totale produite sur la journée sans contrôle : {round(res_p_mw_nc.sum().sum()*15/60, 1)} MWh")
 print(f"Energie totale produite sur la journée avec contrôle : {round(res_p_mw_c.sum().sum()*15/60, 1)} MWh")
 
-def get_voltage_profil(net, res, time):
+def get_voltage_profil(net, res_vm_pu, time):
 
     # Retrieve the indices of external grid buses
     ext_grid_buses = net.ext_grid.bus.tolist()
@@ -106,36 +110,58 @@ def get_voltage_profil(net, res, time):
         supplied_buses[bus] = list(connected)[1:]
 
     sorted_dist_volt = {}
+    ordered_dist_volt = {}
+    Profile_sorted = namedtuple('Profile_sorted', ['distances', 't_voltages'])
+    Profile_ordered = namedtuple('Profile_ordered', ['distances', 'all_voltages'])
+    distances_from_bus = None
+    all_voltages_of_bus = None
 
     for source_bus, buses in supplied_buses.items():
         # Calculate distances from the source bus
-        distances = top.calc_distance_to_bus(net, source_bus).loc[buses]
+        distances_from_bus = top.calc_distance_to_bus(net, source_bus).loc[buses]
 
         # Extract voltage magnitudes for the buses
-        voltages = res.loc[time, [str(bus) for bus in buses]]
+        voltages = res_vm_pu.loc[time, [str(bus) for bus in buses]]
+        all_voltages_of_bus = res_vm_pu.loc[:, [str(bus) for bus in buses]]
 
         # Sort distances and corresponding voltages for plotting
-        sorted_indices = distances.sort_values().index
-        sorted_distances = distances.loc[sorted_indices]
+        sorted_indices = distances_from_bus.sort_values().index
+        sorted_distances = distances_from_bus.loc[sorted_indices]
         sorted_voltages = voltages.loc[[str(id) for id in sorted_indices]]
-        sorted_dist_volt[source_bus] = [sorted_distances, sorted_voltages]
+        # sorted_all_voltages_of_bus = voltages.loc[:,[str(id) for id in sorted_indices]]
+        sorted_dist_volt[source_bus] = Profile_sorted(distances=sorted_distances, t_voltages=sorted_voltages)
+        ordered_dist_volt[source_bus] = Profile_ordered(distances=distances_from_bus, all_voltages=all_voltages_of_bus)
 
-    return sorted_dist_volt
+    return sorted_dist_volt, ordered_dist_volt
 
 midday = time_steps // 2
-voltage_profils_nc = get_voltage_profil(net_no_control, res_vm_pu_nc, midday)
-voltage_profils_c = get_voltage_profil(net_control, res_vm_pu_c, midday)
+voltage_profils_nc_48, voltage_profils_nc = get_voltage_profil(net_no_control, res_vm_pu_nc, midday)
+voltage_profils_c_48, voltage_profils_c = get_voltage_profil(net_control, res_vm_pu_c, midday)
+
+voltage_profils_nc_90, _ = get_voltage_profil(net_no_control, res_vm_pu_nc, 90)
+voltage_profils_c_90, _ = get_voltage_profil(net_control, res_vm_pu_c, 90)
+
+
+
+bus = list(voltage_profils_nc_48.keys())
 
 plt.figure(figsize=(10, 6))
-bus = list(voltage_profils_c.keys())
-plt.scatter(voltage_profils_c[bus[1]][0], voltage_profils_c[bus[1]][1], marker='o', label=f'Feeder from Bus {bus[1]}, with control')
-plt.scatter(voltage_profils_nc[bus[1]][0], voltage_profils_nc[bus[1]][1], marker='o', label=f'Feeder from Bus {bus[1]}, without control')
+
+plt.scatter(voltage_profils_nc_48[bus[0]].distances, voltage_profils_nc_48[bus[0]].t_voltages, marker='o', color='tab:cyan', label=f'Feeder from Bus {bus[0]}, with control, 12h')
+# plt.scatter(voltage_profils_nc_48[bus[1]].distance, voltage_profils_c[bus[1]].voltage, marker='o', color='tab:cyan', label=f'Feeder from Bus {bus[1]}, with control, 12h')
+plt.scatter(voltage_profils_nc_90[bus[0]].distances, voltage_profils_nc_90[bus[0]].t_voltages, marker='o', color='tab:blue', label=f'Feeder from Bus {bus[0]}, with control, 22h30')
+
+plt.scatter(voltage_profils_c_48[bus[0]].distances, voltage_profils_c_48[bus[0]].t_voltages, marker='o', color='tab:orange', label=f'Feeder from Bus {bus[0]}, without control, 12h')
+# plt.scatter(voltage_profils_c_48[bus[1]].distance, voltage_profils_nc[bus[1]].voltage, marker='o', color='tab:red', label=f'Feeder from Bus {bus[1]}, without control, 12h')
+plt.scatter(voltage_profils_c_90[bus[0]].distances, voltage_profils_c_90[bus[0]].t_voltages, marker='o', color='tab:red', label=f'Feeder from Bus {bus[0]}, without control, 22h30')
+
 plt.xlabel('Distance from Source Bus (km)')
 plt.ylabel('Voltage Magnitude (p.u.)')
 plt.title(f'Voltage Profile Along Feeder from Bus {bus}')
 plt.grid(True)
 plt.legend()
 plt.show()
+
 
 # 7. Plot voltage profile at midday (highest PV, lowest load)
 # Tension de tous les bus à un 1/4 d'heure de la journée
