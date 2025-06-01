@@ -67,27 +67,28 @@ _, voltage_profils_c = get_voltage_profil(net_0, res_vm_pu_c)
 
 st.title("Voltage profiles over time")
 
-selected_time = st.slider("Select Time", min_value=0, max_value=95, value=47, step=1)
+selected_time = round(st.slider("Select Time", min_value=0., max_value=23.75, value=12., step=0.25)*4)
 
 trace1 = go.Scatter(
     x=voltage_profils_nc[318].distances.values,
     y=voltage_profils_nc[318].all_voltages.loc[selected_time].values,
-    name='Voltage profile Bus 318',
+    name='Voltage profile Bus 58, without Q=f(U) control',
     mode='markers',
-    marker=dict(color='rgb(34,163,192)')
+    marker=dict(color='rgb(192,163,34)')
 )
 
 trace2 = go.Scatter(
-    x=voltage_profils_nc[58].distances.values,
-    y=voltage_profils_nc[58].all_voltages.loc[selected_time].values,
-    name='Voltage profile Bus 58',
+    x=voltage_profils_c[318].distances.values,
+    y=voltage_profils_c[318].all_voltages.loc[selected_time].values,
+    name='Voltage profile Bus 58, with Q=f(U) control',
     mode='markers',
-    marker=dict(color='rgb(192,163,34)')
+    marker=dict(color='rgb(34,163,192)')
 )
 
 fig = make_subplots()
 fig.add_trace(trace1)
 fig.add_trace(trace2)
+fig.update_layout(yaxis_range=[1.06, 1.115])
 fig['layout'].update(height=600, width=800, title="title")
 
 st.plotly_chart(fig)
