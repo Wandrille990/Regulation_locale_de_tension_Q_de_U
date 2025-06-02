@@ -1,14 +1,11 @@
-import pandapower as pp
 import pandapower.networks as pn
 import pandapower.topology as top
 
 import streamlit as st
-import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import pandas as pd
-import numpy as np
 from collections import namedtuple
 
 
@@ -56,39 +53,41 @@ def get_voltage_profil(net, res_vm_pu, time=47):
 
 net_0 = pn.mv_oberrhein(scenario="generation")
 
-res_vm_pu_nc = pd.read_csv(r"C:\Users\Wandrille\Documents\ESIEE\E4FT\Cours E4FT\Multiphysique\Regulation_locale_de_tension_Q_de_U\Resultats\res_no_ctrl\res_bus\vm_pu.csv", sep=';')
-res_vm_pu_nc = res_vm_pu_nc.drop("Unnamed: 0", axis=1)
-res_vm_pu_c = pd.read_csv(r"C:\Users\Wandrille\Documents\ESIEE\E4FT\Cours E4FT\Multiphysique\Regulation_locale_de_tension_Q_de_U\Resultats\res_ctrl\res_bus\vm_pu.csv", sep=';')
-res_vm_pu_c = res_vm_pu_c.drop("Unnamed: 0", axis=1)
+base_res_path = r"C:\Users\Wandrille\Documents\ESIEE\E4FT\Cours E4FT\Multiphysique\Regulation_locale_de_tension_Q_de_U\Resultats"
+
+res_vm_pu_nc = pd.read_csv(base_res_path + r"\res_no_ctrl\res_bus\vm_pu.csv", sep=';').drop("Unnamed: 0", axis=1)
+res_vm_pu_c = pd.read_csv(base_res_path + r"\res_ctrl\res_bus\vm_pu.csv", sep=';').drop("Unnamed: 0", axis=1)
 
 _, voltage_profils_nc = get_voltage_profil(net_0, res_vm_pu_nc)
 _, voltage_profils_c = get_voltage_profil(net_0, res_vm_pu_c)
 
 
-st.title("Voltage profiles over time")
+st.title("Profil de Tension en fonction du temps")
 
-selected_time = round(st.slider("Select Time", min_value=0., max_value=23.75, value=12., step=0.25)*4)
+selected_time = round(st.slider("Choisissez un horaire :", min_value=0., max_value=23.75, value=12., step=0.25)*4)
 
 trace1 = go.Scatter(
-    x=voltage_profils_nc[318].distances.values,
-    y=voltage_profils_nc[318].all_voltages.loc[selected_time].values,
-    name='Voltage profile Bus 58, without Q=f(U) control',
+    x=voltage_profils_c[318].distances.values,
+    y=voltage_profils_c[318].all_voltages.loc[selected_time].values,
+    name='Profil de Tension du Bus 318, avec régulation Q=f(U)',
     mode='markers',
-    marker=dict(color='rgb(192,163,34)')
+    marker=dict(color='rgb(34,163,192)', symbol='circle', size=8)
 )
 
 trace2 = go.Scatter(
-    x=voltage_profils_c[318].distances.values,
-    y=voltage_profils_c[318].all_voltages.loc[selected_time].values,
-    name='Voltage profile Bus 58, with Q=f(U) control',
+    x=voltage_profils_nc[318].distances.values,
+    y=voltage_profils_nc[318].all_voltages.loc[selected_time].values,
+    name='Profil de Tension du Bus 318, sans régulation Q=f(U)',
     mode='markers',
-    marker=dict(color='rgb(34,163,192)')
+    marker=dict(color='rgb(192,84,34)', symbol='circle')
 )
 
 fig = make_subplots()
 fig.add_trace(trace1)
 fig.add_trace(trace2)
-fig.update_layout(yaxis_range=[1.06, 1.115])
-fig['layout'].update(height=600, width=800, title="title")
+fig.update_layout(xaxis_title="Distance du bus au départ du poste source (km)", yaxis_title="Amplitude de Tension (pu)", yaxis_range=[1.06, 1.115])
+fig.update_layout(legend=dict(x=0.01, y=0.99, xanchor='left', yanchor='top'))
+fig['layout'].update(height=600, width=800)
 
 st.plotly_chart(fig)
+print("")
